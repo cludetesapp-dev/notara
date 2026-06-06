@@ -1,25 +1,8 @@
 import { formatRupiah } from '@/utils/formatters'
-
-interface TransactionItem {
-  id: string
-  customerName?: string
-  partnerName?: string
-  total?: number
-  profit?: number
-  createdAt?: string
-}
+import type { RecentTx } from './useDashboardData'
 
 interface RecentTransactionsProps {
-  transactions: TransactionItem[]
-}
-
-function initials(name: string) {
-  return name
-    .split(' ')
-    .map(p => p[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
+  transactions: RecentTx[]
 }
 
 export function RecentTransactions({
@@ -39,108 +22,43 @@ export function RecentTransactions({
           padding: '18px 20px',
           borderBottom: '1px solid #E8EAED',
           fontWeight: 700,
-          color: '#1F1F1F',
         }}
       >
         Transaksi Terbaru
       </div>
 
-      {transactions.length === 0 && (
+      {transactions.map(tx => (
         <div
+          key={tx.id}
           style={{
-            padding: 32,
-            textAlign: 'center',
-            color: '#5F6368',
+            padding: '14px 20px',
+            borderBottom: '1px solid #F1F3F4',
           }}
         >
-          Belum ada transaksi
-        </div>
-      )}
+          <div style={{ fontWeight: 600 }}>
+            {tx.partnerName}
+          </div>
 
-      {transactions.map(tx => {
-        const name =
-          tx.customerName ||
-          tx.partnerName ||
-          'Pelanggan'
-
-        return (
           <div
-            key={tx.id}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 14,
-              padding: '14px 20px',
-              borderBottom: '1px solid #F1F3F4',
+              fontSize: 12,
+              color: '#5F6368',
+              marginTop: 2,
             }}
           >
-            <div
-              style={{
-                width: 42,
-                height: 42,
-                borderRadius: 14,
-                background: '#D3E3FD',
-                color: '#0B57D0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                flexShrink: 0,
-              }}
-            >
-              {initials(name)}
-            </div>
-
-            <div style={{ flex: 1 }}>
-              <div
-                style={{
-                  fontWeight: 600,
-                  color: '#1F1F1F',
-                }}
-              >
-                {name}
-              </div>
-
-              <div
-                style={{
-                  fontSize: 12,
-                  color: '#5F6368',
-                  marginTop: 2,
-                }}
-              >
-                {tx.createdAt || '-'}
-              </div>
-            </div>
-
-            <div
-              style={{
-                textAlign: 'right',
-              }}
-            >
-              <div
-                style={{
-                  fontWeight: 700,
-                  color: '#1F1F1F',
-                }}
-              >
-                {formatRupiah(tx.total || 0)}
-              </div>
-
-              <div
-                style={{
-                  fontSize: 12,
-                  color:
-                    (tx.profit || 0) >= 0
-                      ? '#0B57D0'
-                      : '#D93025',
-                }}
-              >
-                {formatRupiah(tx.profit || 0)}
-              </div>
-            </div>
+            {tx.date}
           </div>
-        )
-      })}
+
+          <div
+            style={{
+              marginTop: 4,
+              fontWeight: 700,
+            }}
+          >
+            {formatRupiah(tx.total)}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

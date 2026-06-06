@@ -1,10 +1,14 @@
 import { formatRupiah } from '@/utils/formatters'
+import type {
+  DailyStats,
+  MonthlyStats,
+  ReceivablePayable,
+} from './useDashboardData'
 
 interface SummaryCardsProps {
-  revenue: number
-  expense: number
-  profit: number
-  transactionCount: number
+  today: DailyStats
+  month: MonthlyStats
+  rp: ReceivablePayable
 }
 
 function Card({
@@ -26,13 +30,7 @@ function Card({
         boxShadow: '0 1px 3px rgba(0,0,0,.06)',
       }}
     >
-      <div
-        style={{
-          fontSize: 12,
-          color: '#5F6368',
-          marginBottom: 8,
-        }}
-      >
+      <div style={{ fontSize: 12, color: '#5F6368', marginBottom: 8 }}>
         {title}
       </div>
 
@@ -41,7 +39,6 @@ function Card({
           fontSize: 24,
           fontWeight: 700,
           color: '#1F1F1F',
-          letterSpacing: '-0.03em',
         }}
       >
         {value}
@@ -61,18 +58,12 @@ function Card({
 }
 
 export function SummaryCards({
-  revenue,
-  expense,
-  profit,
-  transactionCount,
+  today,
+  month,
+  rp,
 }: SummaryCardsProps) {
   return (
-    <div
-      style={{
-        display: 'grid',
-        gap: 16,
-      }}
-    >
+    <div style={{ display: 'grid', gap: 16 }}>
       <div
         style={{
           background: '#E8F0FE',
@@ -88,7 +79,7 @@ export function SummaryCards({
             marginBottom: 8,
           }}
         >
-          Total Profit
+          Profit Bulan Ini
         </div>
 
         <div
@@ -96,10 +87,9 @@ export function SummaryCards({
             fontSize: 36,
             fontWeight: 800,
             color: '#0B57D0',
-            letterSpacing: '-0.04em',
           }}
         >
-          {formatRupiah(profit)}
+          {formatRupiah(month.profit)}
         </div>
 
         <div
@@ -109,7 +99,7 @@ export function SummaryCards({
             fontSize: 13,
           }}
         >
-          {transactionCount} transaksi
+          {month.txCount} transaksi
         </div>
       </div>
 
@@ -121,15 +111,27 @@ export function SummaryCards({
         }}
       >
         <Card
-          title="Penjualan"
-          value={formatRupiah(revenue)}
-          subtitle="Total pemasukan"
+          title="Omset Hari Ini"
+          value={formatRupiah(today.omset)}
+          subtitle={`${today.txCount} transaksi`}
         />
 
         <Card
-          title="Pembelian"
-          value={formatRupiah(expense)}
-          subtitle="Total pengeluaran"
+          title="Piutang"
+          value={formatRupiah(rp.totalPiutang)}
+          subtitle={`${rp.countPiutang} transaksi`}
+        />
+
+        <Card
+          title="Pembelian Hari Ini"
+          value={formatRupiah(today.purchase)}
+          subtitle="Total purchase"
+        />
+
+        <Card
+          title="Utang"
+          value={formatRupiah(rp.totalUtang)}
+          subtitle={`${rp.countUtang} transaksi`}
         />
       </div>
     </div>
