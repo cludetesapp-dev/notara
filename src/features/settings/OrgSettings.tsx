@@ -22,10 +22,7 @@ export const SETTING_KEYS = {
 } as const
 
 // ─── Helper ──────────────────────────────────────────────────
-async function getSetting(key: string): Promise<string> {
-  const row = await db.settings.get(key)
-  return row?.value ?? ''
-}
+
 
 async function setSetting(key: string, value: string): Promise<void> {
   await db.settings.put({ key, value })

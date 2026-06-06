@@ -95,10 +95,7 @@ async function importBackup(file: File): Promise<{ ok: boolean; message: string 
 
   // Restore — hapus semua data lama, masukkan data backup
   try {
-    await db.transaction('rw',
-      db.products, db.partners, db.transactions,
-      db.transactionItems, db.settings,
-      async () => {
+    await db.transaction('rw', [db.products, db.partners, db.transactions, db.transactionItems, db.settings], async () => {
         await db.products.clear()
         await db.partners.clear()
         await db.transactions.clear()

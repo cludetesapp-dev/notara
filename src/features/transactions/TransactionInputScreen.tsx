@@ -19,7 +19,7 @@ interface Props {
 export function TransactionInputScreen({ hook }: Props) {
   const {
     open, form, cart, loading, error, isEditMode,
-    subtotal, discount, total, profit, sisa,
+    subtotal, discount, total, sisa,
     selectedPartner, partnerHasBank,
     products, partners,
     closeForm, setField, selectPartner,

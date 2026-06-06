@@ -132,7 +132,7 @@ interface StatCardProps {
   valueMono?:   boolean
 }
 
-function StatCard({ icon, label, value, sub, accentColor, fullWidth, valueMono = true }: StatCardProps) {
+function StatCard({ icon, label, value, sub, accentColor: _accentColor, fullWidth, valueMono = true }: StatCardProps) {
   return (
     <div
       style={{
