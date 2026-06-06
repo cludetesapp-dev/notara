@@ -1,3 +1,6 @@
+#!/bin/bash
+
+cat > src/features/dashboard/RecentTransactions.tsx <<'FILE'
 import { formatRupiah } from '@/utils/formatters'
 
 interface TransactionItem {
@@ -144,3 +147,6 @@ export function RecentTransactions({
     </div>
   )
 }
+FILE
+
+echo "RecentTransactions Material 3 installed"
