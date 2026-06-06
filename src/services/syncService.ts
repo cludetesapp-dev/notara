@@ -153,7 +153,7 @@ async function pullTable(
   if (!dexie) return
 
   for (const row of rows) {
-    const camel = snakeToCamel(row)
+    const camel = snakeToCamel(row) as { id: string; updatedAt: string; [key:string]: unknown }
 
     // Last-write-wins: hanya update jika remote lebih baru
     const existing = await dexie.get(camel.id)

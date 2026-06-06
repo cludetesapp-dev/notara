@@ -1,0 +1,498 @@
+===== syncService.ts =====
+// ═══════════════════════════════════════════════════
+// services/syncService.ts — Cloud Sync NOTARA (KRITIS)
+//
+// Strategy: Offline-First, Last-Write-Wins (updatedAt)
+// Flow wajib: Drain Queue → Pull from Supabase
+// Sync tidak pernah memblokir operasi lokal.
+// ═══════════════════════════════════════════════════
+
+import { db }         from '@/db/database'
+import { SyncError }  from '@/core/errors'
+import type { SyncQueueItem } from '@/types/common'
+
+// ── Supabase env check ─────────────────────────────
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL  as string | undefined
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+export const SYNC_ENABLED = !!(SUPABASE_URL && SUPABASE_KEY)
+
+// Max percobaan per item sebelum ditandai failed
+const MAX_ATTEMPTS = 3
+
+// ── Supabase REST helper ───────────────────────────
+// Menggunakan fetch langsung ke Supabase REST API
+// agar tidak perlu client SDK di sync layer.
+
+function supabaseHeaders(token?: string): HeadersInit {
+  return {
+    'Content-Type':  'application/json',
+    'apikey':        SUPABASE_KEY!,
+    'Authorization': `Bearer ${token ?? SUPABASE_KEY!}`,
+    'Prefer':        'resolution=merge-duplicates',
+  }
+}
+
+async function getAccessToken(): Promise<string> {
+  // Import lazy — hanya jika sync enabled
+  const { createClient } = await import('@supabase/supabase-js')
+  const sb = createClient(SUPABASE_URL!, SUPABASE_KEY!)
+  const { data } = await sb.auth.getSession()
+  return data.session?.access_token ?? SUPABASE_KEY!
+}
+
+// ── Peta nama tabel Dexie → Supabase ──────────────
+const TABLE_MAP: Record<string, string> = {
+  products:         'products',
+  partners:         'partners',
+  transactions:     'transactions',
+  transactionItems: 'transaction_items',
+}
+
+// ── Tambah item ke sync queue ──────────────────────
+export async function enqueue(
+  table:    string,
+  recordId: string,
+  action:   'upsert' | 'delete',
+  payload:  object,
+): Promise<void> {
+  if (!SYNC_ENABLED) return
+
+  const item: SyncQueueItem = {
+    id:        crypto.randomUUID(),
+    table,
+    recordId,
+    action,
+    payload:   JSON.stringify(payload),
+    createdAt: new Date().toISOString(),
+    attempts:  0,
+  }
+  await db.syncQueue.put(item)
+}
+
+// ── Drain: upload semua item queue ke Supabase ─────
+async function drainQueue(token: string, userId: string): Promise<void> {
+  const items = await db.syncQueue
+    .where('attempts').below(MAX_ATTEMPTS)
+    .sortBy('createdAt')
+
+  for (const item of items) {
+    const sbTable = TABLE_MAP[item.table]
+    if (!sbTable) {
+      await db.syncQueue.delete(item.id)
+      continue
+    }
+
+    try {
+      if (item.action === 'upsert') {
+        // Konversi camelCase (Dexie) → snake_case (Supabase) + inject user_id
+        const camelPayload = JSON.parse(item.payload)
+        const snakePayload = camelToSnake(camelPayload)
+        snakePayload['user_id'] = userId
+
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/${sbTable}`,
+          {
+            method:  'POST',
+            headers: { ...supabaseHeaders(token), 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+            body:    JSON.stringify(snakePayload),
+          }
+        )
+        if (!res.ok && res.status !== 409) throw new Error(`HTTP ${res.status}`)
+
+      } else if (item.action === 'delete') {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/${sbTable}?id=eq.${item.recordId}`,
+          { method: 'DELETE', headers: supabaseHeaders(token) }
+        )
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      }
+
+      // Sukses → hapus dari queue, tandai synced di Dexie
+      await db.syncQueue.delete(item.id)
+      await markSynced(item.table, item.recordId)
+
+    } catch {
+      // Gagal → increment attempts
+      await db.syncQueue.update(item.id, { attempts: item.attempts + 1 })
+
+      // Jika sudah MAX_ATTEMPTS → tandai failed di entity
+      if (item.attempts + 1 >= MAX_ATTEMPTS) {
+        await markFailed(item.table, item.recordId)
+      }
+    }
+  }
+}
+
+// ── Pull: ambil data terbaru dari Supabase ─────────
+async function pullFromSupabase(token: string, userId: string): Promise<void> {
+  // Pull semua tabel, filter by user_id
+  await Promise.all([
+    pullTable(token, userId, 'products',         'products'),
+    pullTable(token, userId, 'partners',         'partners'),
+    pullTable(token, userId, 'transactions',     'transactions'),
+    pullTable(token, userId, 'transaction_items','transactionItems'),
+  ])
+}
+
+async function pullTable(
+  token:      string,
+  userId:     string,
+  sbTable:    string,
+  dexieTable: string,
+): Promise<void> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/${sbTable}?user_id=eq.${userId}&order=updated_at.asc`,
+    { headers: supabaseHeaders(token) }
+  )
+  if (!res.ok) return
+
+  const rows: Record<string, unknown>[] = await res.json()
+  if (!rows.length) return
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dexie = (db as any)[dexieTable]
+  if (!dexie) return
+
+  for (const row of rows) {
+    const camel = snakeToCamel(row)
+
+    // Last-write-wins: hanya update jika remote lebih baru
+    const existing = await dexie.get(camel.id)
+    if (existing && existing.updatedAt >= camel.updatedAt) continue
+
+    await dexie.put({ ...camel, syncStatus: 'synced' })
+  }
+}
+
+// ── Public: jalankan sync lengkap ─────────────────
+export async function runSync(userId: string): Promise<void> {
+  if (!SYNC_ENABLED) return
+
+  let token: string
+  try {
+    token = await getAccessToken()
+  } catch {
+    throw new SyncError('Tidak bisa mendapatkan token auth untuk sync.')
+  }
+
+  // Step 1: drain queue dulu (upload lokal)
+  await drainQueue(token, userId)
+
+  // Step 2: pull dari Supabase (download remote)
+  await pullFromSupabase(token, userId)
+}
+
+// ── Reset failed items → pending (retry manual) ───
+export async function resetFailedQueue(): Promise<void> {
+  const failed = await db.syncQueue
+    .filter(item => item.attempts >= MAX_ATTEMPTS)
+    .toArray()
+
+  for (const item of failed) {
+    await db.syncQueue.update(item.id, { attempts: 0 })
+  }
+}
+
+// ── Count pending items ────────────────────────────
+export async function getPendingCount(): Promise<number> {
+  return db.syncQueue.count()
+}
+
+// ── Helper: tandai entity sebagai synced / failed ──
+async function markSynced(table: string, id: string): Promise<void> {
+  await updateSyncStatus(table, id, 'synced')
+}
+
+async function markFailed(table: string, id: string): Promise<void> {
+  await updateSyncStatus(table, id, 'failed')
+}
+
+async function updateSyncStatus(
+  table:      string,
+  id:         string,
+  status:     'synced' | 'failed',
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dexie = (db as any)[table]
+  if (!dexie) return
+  await dexie.update(id, { syncStatus: status })
+}
+
+// ── Snake_case → camelCase (Supabase → Dexie) ─────
+function snakeToCamel(obj: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+  for (const [key, val] of Object.entries(obj)) {
+    const camel = key.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
+    result[camel] = val
+  }
+  return result
+}
+
+// ── camelCase → snake_case (Dexie → Supabase) ─────
+function camelToSnake(obj: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+  for (const [key, val] of Object.entries(obj)) {
+    const snake = key.replace(/([A-Z])/g, (c: string) => `_${c.toLowerCase()}`)
+    result[snake] = val
+  }
+  return result
+}
+
+
+===== BackupRestore.tsx =====
+// ═══════════════════════════════════════════════════
+// features/settings/BackupRestore.tsx
+// Export JSON backup & import/restore dengan validasi versi
+// Format backup sesuai CLAUDE.md
+// ═══════════════════════════════════════════════════
+
+import { useState, useRef } from 'react'
+import { Download, Upload, AlertTriangle } from 'lucide-react'
+import { db } from '@/db/database'
+import { APP_VERSION } from '@/core/version'
+import { useUiStore } from '@/state/uiStore'
+
+// ─── Format backup CLAUDE.md ──────────────────────────────────
+interface BackupPayload {
+  app:       string
+  version:   string
+  timestamp: string
+  data: {
+    products:         unknown[]
+    partners:         unknown[]
+    transactions:     unknown[]
+    transactionItems: unknown[]
+    settings:         unknown[]
+  }
+}
+
+// ─── Export ───────────────────────────────────────────────────
+
+async function exportBackup(): Promise<void> {
+  const [products, partners, transactions, transactionItems, settings] = await Promise.all([
+    db.products.toArray(),
+    db.partners.toArray(),
+    db.transactions.toArray(),
+    db.transactionItems.toArray(),
+    db.settings.toArray(),
+  ])
+
+  const payload: BackupPayload = {
+    app:       'NOTARA',
+    version:   APP_VERSION,
+    timestamp: new Date().toISOString(),
+    data:      { products, partners, transactions, transactionItems, settings },
+  }
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  a.href     = url
+  a.download = `notara-backup-${date}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Import / Restore ─────────────────────────────────────────
+
+async function importBackup(file: File): Promise<{ ok: boolean; message: string }> {
+  let raw: string
+  try {
+    raw = await file.text()
+  } catch {
+    return { ok: false, message: 'Gagal membaca file' }
+  }
+
+  let payload: BackupPayload
+  try {
+    payload = JSON.parse(raw)
+  } catch {
+    return { ok: false, message: 'File bukan format JSON yang valid' }
+  }
+
+  // Validasi struktur
+  if (payload.app !== 'NOTARA') {
+    return { ok: false, message: 'File bukan backup NOTARA' }
+  }
+  if (!payload.version || !payload.data) {
+    return { ok: false, message: 'Format backup tidak dikenali' }
+  }
+
+  // Validasi major version harus sama
+  const backupMajor  = parseInt(payload.version.split('.')[0], 10)
+  const currentMajor = parseInt(APP_VERSION.split('.')[0], 10)
+  if (backupMajor !== currentMajor) {
+    return {
+      ok: false,
+      message: `Versi backup (v${payload.version}) tidak kompatibel dengan versi saat ini (v${APP_VERSION}). Major version harus sama.`,
+    }
+  }
+
+  const d = payload.data
+  if (!Array.isArray(d.products) || !Array.isArray(d.partners) ||
+      !Array.isArray(d.transactions) || !Array.isArray(d.transactionItems)) {
+    return { ok: false, message: 'Struktur data backup tidak valid' }
+  }
+
+  // Restore — hapus semua data lama, masukkan data backup
+  try {
+    await db.transaction('rw',
+      db.products, db.partners, db.transactions,
+      db.transactionItems, db.settings,
+      async () => {
+        await db.products.clear()
+        await db.partners.clear()
+        await db.transactions.clear()
+        await db.transactionItems.clear()
+        await db.settings.clear()
+
+        if (d.products.length)         await db.products.bulkAdd(d.products as any)
+        if (d.partners.length)         await db.partners.bulkAdd(d.partners as any)
+        if (d.transactions.length)     await db.transactions.bulkAdd(d.transactions as any)
+        if (d.transactionItems.length) await db.transactionItems.bulkAdd(d.transactionItems as any)
+        if (d.settings && Array.isArray(d.settings) && d.settings.length)
+          await db.settings.bulkAdd(d.settings as any)
+      }
+    )
+    return { ok: true, message: `Berhasil restore dari backup ${payload.version} (${new Date(payload.timestamp).toLocaleDateString('id-ID')})` }
+  } catch (e: any) {
+    return { ok: false, message: `Gagal restore: ${e?.message ?? 'unknown error'}` }
+  }
+}
+
+// ─── Komponen ─────────────────────────────────────────────────
+
+export function BackupRestore() {
+  const [exporting,  setExporting]  = useState(false)
+  const [importing,  setImporting]  = useState(false)
+  const [importInfo, setImportInfo] = useState<{ ok:boolean; message:string } | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const { toast, showConfirm } = useUiStore()
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      await exportBackup()
+      toast('success', 'Backup berhasil diunduh')
+    } catch {
+      toast('error', 'Gagal membuat backup')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Reset input agar file yang sama bisa dipilih lagi
+    e.target.value = ''
+
+    showConfirm(
+      'Restore Backup',
+      'Semua data saat ini akan DIHAPUS dan diganti dengan data dari file backup. Lanjutkan?',
+      async () => {
+        setImporting(true)
+        setImportInfo(null)
+        const result = await importBackup(file)
+        setImportInfo(result)
+        if (result.ok) {
+          toast('success', result.message)
+        } else {
+          toast('error', result.message)
+        }
+        setImporting(false)
+      }
+    )
+  }
+
+  return (
+    <div style={{ background:'#fff', borderRadius:'var(--r-lg)', border:'1.5px solid #e8f0e8', overflow:'hidden' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 16px', borderBottom:'1px solid #f0f5f0', background:'#fafaf9' }}>
+        <Download size={16} color="var(--green)" />
+        <span style={{ fontSize:13, fontWeight:800, color:'var(--soil)' }}>Backup & Restore</span>
+      </div>
+
+      <div style={{ padding:'14px 16px', display:'flex', flexDirection:'column', gap:12 }}>
+        <p style={{ fontSize:12, color:'var(--stone)', fontWeight:600, lineHeight:1.6, margin:0 }}>
+          Backup menyimpan seluruh data (produk, mitra, transaksi, pengaturan) ke file JSON.
+          Restore menggantikan semua data dengan isi file backup.
+        </p>
+
+        {/* Export */}
+        <button
+          onClick={handleExport}
+          disabled={exporting}
+          style={{
+            display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+            width:'100%', padding:'12px',
+            borderRadius:'var(--r-sm)', border:'1.5px solid var(--green)',
+            background: exporting ? 'var(--green-pale)' : 'var(--green-pale)',
+            color:'var(--green)', fontSize:13, fontWeight:800, fontFamily:'inherit',
+            cursor: exporting ? 'not-allowed' : 'pointer',
+          }}
+        >
+          <Download size={15} />
+          {exporting ? 'Mempersiapkan backup…' : 'Export Backup (.json)'}
+        </button>
+
+        {/* Divider */}
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{ flex:1, height:1, background:'#e8f0e8' }} />
+          <span style={{ fontSize:10, fontWeight:700, color:'var(--stone)' }}>ATAU</span>
+          <div style={{ flex:1, height:1, background:'#e8f0e8' }} />
+        </div>
+
+        {/* Import */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".json"
+          onChange={handleFileChange}
+          style={{ display:'none' }}
+        />
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={importing}
+          style={{
+            display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+            width:'100%', padding:'12px',
+            borderRadius:'var(--r-sm)', border:'1.5px solid #fde68a',
+            background:'#fffbeb',
+            color:'var(--amber)', fontSize:13, fontWeight:800, fontFamily:'inherit',
+            cursor: importing ? 'not-allowed' : 'pointer',
+          }}
+        >
+          <Upload size={15} />
+          {importing ? 'Memproses restore…' : 'Import Backup (.json)'}
+        </button>
+
+        {/* Peringatan */}
+        <div style={{
+          display:'flex', gap:8, padding:'10px 12px',
+          background:'#fff9f0', borderRadius:'var(--r-sm)',
+          border:'1.5px solid #fed7aa',
+        }}>
+          <AlertTriangle size={14} color="var(--amber)" style={{ flexShrink:0, marginTop:1 }} />
+          <p style={{ fontSize:11, color:'var(--amber)', fontWeight:600, margin:0, lineHeight:1.6 }}>
+            Restore akan menghapus semua data yang ada. Selalu export backup terbaru sebelum melakukan restore.
+          </p>
+        </div>
+
+        {/* Hasil import */}
+        {importInfo && (
+          <div style={{
+            padding:'10px 12px', borderRadius:'var(--r-sm)',
+            background: importInfo.ok ? '#f0fdf4' : '#fef2f2',
+            border: `1.5px solid ${importInfo.ok ? '#bbf7d0' : '#fecaca'}`,
+            fontSize:12, fontWeight:600,
+            color: importInfo.ok ? 'var(--green)' : 'var(--red)',
+          }}>
+            {importInfo.message}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

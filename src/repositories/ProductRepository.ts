@@ -1,26 +1,18 @@
-// ═══════════════════════════════════════════════════
-// repositories/ProductRepository.ts
-// Query layer — hanya boleh diakses dari Service
-// ═══════════════════════════════════════════════════
-
 import { db } from '@/db/database'
 import type { Product } from '@/types/product'
 import { DatabaseError } from '@/core/errors'
 
 export const ProductRepository = {
-  /** Semua produk aktif (tidak archived, tidak deleted) */
   async findActive(): Promise<Product[]> {
     try {
       return await db.products
-        .where('isArchived').equals(0 as unknown as boolean)
-        .and(p => !p.deletedAt)
+        .filter(p => !p.isArchived && !p.deletedAt)
         .toArray()
     } catch (e) {
       throw new DatabaseError('Gagal memuat daftar barang', e)
     }
   },
 
-  /** Semua produk termasuk yang archived */
   async findAll(): Promise<Product[]> {
     try {
       return await db.products
@@ -55,7 +47,6 @@ export const ProductRepository = {
     }
   },
 
-  /** Cek apakah produk pernah dipakai di transaksi */
   async hasTransactions(productId: string): Promise<boolean> {
     try {
       const count = await db.transactionItems
@@ -67,7 +58,6 @@ export const ProductRepository = {
     }
   },
 
-  /** Hard delete — hanya jika belum pernah bertransaksi */
   async hardDelete(id: string): Promise<void> {
     try {
       await db.products.delete(id)
@@ -76,13 +66,13 @@ export const ProductRepository = {
     }
   },
 
-  /** Update stok langsung (pakai di dalam db.transaction) */
   async adjustStock(id: string, delta: number, now: string): Promise<void> {
     const product = await db.products.get(id)
     if (!product) throw new DatabaseError(`Barang tidak ditemukan: ${id}`)
+
     await db.products.update(id, {
-      stock:      product.stock + delta,
-      updatedAt:  now,
+      stock: product.stock + delta,
+      updatedAt: now,
       syncStatus: 'pending',
     })
   },

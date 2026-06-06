@@ -85,12 +85,12 @@ export function useTransactionForm(onSaved: () => void) {
   const [error,      setError]      = useState<string | null>(null)
 
   const products = useLiveQuery(
-    () => db.products.where('isArchived').equals(0 as unknown as boolean).toArray(),
+    () => db.products.filter(p => !p.isArchived).toArray(),
     [],
   ) ?? []
 
   const partners = useLiveQuery(
-    () => db.partners.where('isArchived').equals(0 as unknown as boolean).toArray(),
+    () => db.partners.filter(p => !p.isArchived).toArray(),
     [],
   ) ?? []
 

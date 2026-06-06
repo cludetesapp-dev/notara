@@ -1,7 +1,3 @@
-// ═══════════════════════════════════════════════════
-// repositories/PartnerRepository.ts
-// ═══════════════════════════════════════════════════
-
 import { db } from '@/db/database'
 import type { Partner } from '@/types/partner'
 import { DatabaseError } from '@/core/errors'
@@ -10,8 +6,7 @@ export const PartnerRepository = {
   async findActive(): Promise<Partner[]> {
     try {
       return await db.partners
-        .where('isArchived').equals(0 as unknown as boolean)
-        .and(p => !p.deletedAt)
+        .filter(p => !p.isArchived && !p.deletedAt)
         .toArray()
     } catch (e) {
       throw new DatabaseError('Gagal memuat daftar mitra', e)
@@ -21,7 +16,8 @@ export const PartnerRepository = {
   async findByType(type: Partner['type']): Promise<Partner[]> {
     try {
       return await db.partners
-        .where('type').equals(type)
+        .where('type')
+        .equals(type)
         .and(p => !p.isArchived && !p.deletedAt)
         .toArray()
     } catch (e) {
@@ -56,8 +52,10 @@ export const PartnerRepository = {
   async hasTransactions(partnerId: string): Promise<boolean> {
     try {
       const count = await db.transactions
-        .where('partnerId').equals(partnerId)
+        .where('partnerId')
+        .equals(partnerId)
         .count()
+
       return count > 0
     } catch (e) {
       throw new DatabaseError('Gagal memeriksa riwayat transaksi', e)

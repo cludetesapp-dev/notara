@@ -10,7 +10,7 @@ import {
   Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { useYearlyReport } from './useReportData'
-import { formatRupiahCompact, formatRupiah } from '@/utils/format'
+import { formatRupiahCompact } from '@/utils/format'
 
 function Shimmer({ h = 56 }: { h?: number }) {
   return (

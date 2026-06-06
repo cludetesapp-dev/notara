@@ -5,7 +5,7 @@
 
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/db/database'
-import type { Transaction, TransactionItem } from '@/types/transaction'
+import type { TransactionItem } from '@/types/transaction'
 
 // ─── Shape output ────────────────────────────────────────────
 
