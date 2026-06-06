@@ -1,3 +1,6 @@
+#!/bin/bash
+
+cat > src/features/dashboard/TopProducts.tsx <<'FILE'
 import { formatRupiah } from '@/utils/formatters'
 
 interface ProductItem {
@@ -147,3 +150,6 @@ export function TopProducts({
     </div>
   )
 }
+FILE
+
+echo "TopProducts Material 3 installed"
