@@ -1,3 +1,6 @@
+#!/bin/bash
+
+cat > src/components/layout/BottomNav.tsx <<'FILE'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -128,3 +131,6 @@ export function BottomNav({
     </nav>
   )
 }
+FILE
+
+echo "BottomNav Material 3 installed"
