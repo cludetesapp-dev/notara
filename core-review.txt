@@ -1,0 +1,1195 @@
+===== APP =====
+import { RouterProvider } from 'react-router-dom'
+import { Providers } from './providers'
+import { router } from './router'
+
+export default function App() {
+  return (
+    <Providers>
+      <RouterProvider router={router} />
+    </Providers>
+  )
+}
+
+===== ROUTER =====
+// ═══════════════════════════════════════════════════
+// app/router.tsx — Router dengan protected routes
+// ═══════════════════════════════════════════════════
+
+import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom'
+import { AppLayout }       from '@/components/layout/AppLayout'
+import DashboardPage       from '@/features/dashboard/DashboardPage'
+import TransactionListPage from '@/features/transactions/TransactionListPage'
+import ProductListPage     from '@/features/products/ProductListPage'
+import CustomerListPage    from '@/features/partners/CustomerListPage'
+import SupplierListPage    from '@/features/partners/SupplierListPage'
+import ReportPage          from '@/features/reports/ReportPage'
+import SettingsPage        from '@/features/settings/SettingsPage'
+import LoginPage           from '@/features/auth/LoginPage'
+import ForgotPasswordPage  from '@/features/auth/ForgotPasswordPage'
+import ResetPasswordPage   from '@/features/auth/ResetPasswordPage'
+import { useAuthStore }    from '@/state/authStore'
+
+// ── Loading screen saat startup ────────────────────
+function AppLoadingScreen() {
+  return (
+    <div style={{
+      height:          '100dvh',
+      display:         'flex',
+      flexDirection:   'column',
+      alignItems:      'center',
+      justifyContent:  'center',
+      background:      'var(--bg)',
+      gap:             16,
+    }}>
+      <div style={{
+        width:           52,
+        height:          52,
+        background:      'var(--soil)',
+        borderRadius:    12,
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'center',
+      }}>
+        <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
+          <path d="M6 30V6l18 18V6" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--stone)', fontWeight: 600, letterSpacing: 0.5 }}>
+        Memuat...
+      </div>
+    </div>
+  )
+}
+
+// ── Guard: hanya bisa diakses jika sudah login ─────
+function ProtectedRoute() {
+  const status = useAuthStore(s => s.status)
+
+  if (status === 'loading')         return <AppLoadingScreen />
+  if (status === 'unauthenticated') return <Navigate to="/login" replace />
+  return <Outlet />
+}
+
+// ── Guard: redirect ke dashboard jika sudah login ──
+function PublicRoute() {
+  const status = useAuthStore(s => s.status)
+
+  if (status === 'loading')       return <AppLoadingScreen />
+  if (status === 'authenticated') return <Navigate to="/" replace />
+  return <Outlet />
+}
+
+// Placeholder pages
+const Placeholder = ({ label }: { label: string }) => (
+  <div className="page-scroll">
+    <div className="wrap">
+      <p style={{ color: 'var(--stone)', fontSize: 13, fontWeight: 600, textAlign: 'center', marginTop: 40 }}>
+        {label} — segera hadir
+      </p>
+    </div>
+  </div>
+)
+
+export const router = createBrowserRouter([
+  // ── Public routes (login, reset password) ─────
+  {
+    element: <PublicRoute />,
+    children: [
+      { path: '/login',           element: <LoginPage /> },
+      { path: '/forgot-password', element: <ForgotPasswordPage /> },
+    ],
+  },
+
+  // Reset password boleh diakses dari email link (tidak pakai PublicRoute)
+  { path: '/reset-password', element: <ResetPasswordPage /> },
+
+  // ── Protected routes ───────────────────────────
+  {
+    element: <ProtectedRoute />,
+    children: [
+      {
+        path: '/',
+        element: <AppLayout />,
+        children: [
+          { index: true,          element: <DashboardPage /> },
+          { path: 'transactions', element: <TransactionListPage /> },
+          { path: 'products',     element: <ProductListPage /> },
+          { path: 'partners',     element: <CustomerListPage /> },
+          { path: 'customers',    element: <CustomerListPage /> },
+          { path: 'suppliers',    element: <SupplierListPage /> },
+          { path: 'reports',      element: <ReportPage /> },
+          { path: 'settings',     element: <SettingsPage /> },
+          { path: 'backup',       element: <Placeholder label="Backup" /> },
+          { path: 'trash',        element: <Placeholder label="Arsip" /> },
+        ],
+      },
+    ],
+  },
+
+  // Fallback
+  { path: '*', element: <Navigate to="/" replace /> },
+])
+
+===== APP LAYOUT =====
+// ═══════════════════════════════════════════════════
+// components/layout/AppLayout.tsx
+// ═══════════════════════════════════════════════════
+
+import { Outlet }          from 'react-router-dom'
+import { TopBar }          from './TopBar'
+import { BottomNav }       from './BottomNav'
+import { SyncBanner }      from './SyncBanner'
+import { MenuSheet }       from './MenuSheet'
+import { TransactionInputScreen } from '@/features/transactions/TransactionInputScreen'
+import { useTransactionForm }     from '@/features/transactions/useTransactionForm'
+import { ToastContainer, ConfirmDialog } from '@/components/shared/Overlays'
+import { useUiStore }      from '@/state/uiStore'
+import { useOnlineStatus } from '@/hooks/useOnlineStatus'
+import { useSync }         from '@/hooks/useSync'
+import { useState }        from 'react'
+
+export function AppLayout() {
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  const isOnline = useOnlineStatus()
+  const { isSyncing, hasFailed } = useSync()
+
+  const toast  = useUiStore(s => s.toast)
+  const txForm = useTransactionForm(() => {
+    toast('success', 'Transaksi berhasil disimpan')
+  })
+
+  function handleAdd() {
+    txForm.openForm('SALE')
+  }
+
+  function handlePrintNota() {
+    // TODO Task Nota
+  }
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <SyncBanner isSyncing={isSyncing} />
+
+      <TopBar
+        isOnline={isOnline}
+        isSyncing={isSyncing}
+        hasFailed={hasFailed}
+        onPrintNota={handlePrintNota}
+      />
+
+      <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+        <Outlet context={{ openTransactionForm: txForm.openForm }} />
+      </main>
+
+      <BottomNav
+        onAdd={handleAdd}
+        onMenu={() => setMenuOpen(true)}
+      />
+
+      <MenuSheet
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+      />
+
+      <TransactionInputScreen hook={txForm} />
+
+      <ToastContainer />
+      <ConfirmDialog />
+    </div>
+  )
+}
+
+===== INDEX CSS =====
+/* ══════════════════════════════════════════════════
+   NOTARA — Material Design 3 Theme
+   Google Blue / Material You
+   ══════════════════════════════════════════════════ */
+
+/* ── Design Tokens ─────────────────────────────── */
+:root {
+  /* M3 Color Roles */
+  --md-primary:            #0B57D0;
+  --md-on-primary:         #FFFFFF;
+  --md-primary-container:  #D3E3FD;
+  --md-on-primary-container: #041E49;
+
+  --md-secondary:          #4A6FA5;
+  --md-on-secondary:       #FFFFFF;
+  --md-secondary-container:#DAE2F9;
+  --md-on-secondary-container:#1B2E52;
+
+  --md-tertiary:           #006E5A;
+  --md-on-tertiary:        #FFFFFF;
+  --md-tertiary-container: #A1F2DC;
+  --md-on-tertiary-container:#002117;
+
+  --md-error:              #B3261E;
+  --md-error-container:    #F9DEDC;
+
+  --md-surface:            #F8FAFF;
+  --md-on-surface:         #1A1C1E;
+  --md-surface-variant:    #E1E2EC;
+  --md-on-surface-variant: #44464F;
+
+  --md-surface-container-lowest:  #FFFFFF;
+  --md-surface-container-low:     #F1F3FA;
+  --md-surface-container:         #EAECF5;
+  --md-surface-container-high:    #E4E6EF;
+  --md-surface-container-highest: #DEE0E9;
+
+  --md-outline:            #74777F;
+  --md-outline-variant:    #C4C6D0;
+
+  --md-inverse-surface:    #2F3033;
+  --md-inverse-on-surface: #F2F0F4;
+
+  /* Typography Scale */
+  --type-display-large:    57px / 64px;
+  --type-display-medium:   45px / 52px;
+  --type-display-small:    36px / 44px;
+  --type-headline-large:   32px / 40px;
+  --type-headline-medium:  28px / 36px;
+  --type-headline-small:   24px / 32px;
+  --type-title-large:      22px / 28px;
+  --type-title-medium:     16px / 24px;
+  --type-title-small:      14px / 20px;
+  --type-body-large:       16px / 24px;
+  --type-body-medium:      14px / 20px;
+  --type-body-small:       12px / 16px;
+  --type-label-large:      14px / 20px;
+  --type-label-medium:     12px / 16px;
+  --type-label-small:      11px / 16px;
+
+  /* Shape */
+  --shape-xs:   4px;
+  --shape-sm:   8px;
+  --shape-md:   12px;
+  --shape-lg:   16px;
+  --shape-xl:   28px;
+  --shape-full: 9999px;
+
+  /* Elevation (tonal) */
+  --elevation-1: 0 1px 2px rgba(0,0,0,.08), 0 1px 3px 1px rgba(0,0,0,.04);
+  --elevation-2: 0 1px 2px rgba(0,0,0,.06), 0 2px 6px 2px rgba(0,0,0,.06);
+  --elevation-3: 0 4px 8px 3px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.08);
+
+  /* Layout */
+  --nav-h:       80px;
+  --topbar-h:    64px;
+
+  /* Legacy aliases (backward compat — mapped to M3 tokens) */
+  --green:          var(--md-primary);
+  --green-mid:      #1A73E8;
+  --green-light:    var(--md-primary-container);
+  --green-pale:     var(--md-surface-container-low);
+  --green-muted:    var(--md-primary-container);
+  --amber:          var(--md-secondary);
+  --amber-light:    #1A73E8;
+  --amber-pale:     var(--md-surface-container-low);
+  --amber-border:   var(--md-outline-variant);
+  --soil:           var(--md-on-surface);
+  --clay:           var(--md-on-surface-variant);
+  --stone:          #74777F;
+  --cream:          var(--md-surface-container-lowest);
+  --red:            var(--md-error);
+  --red-pale:       var(--md-error-container);
+  --rose-pale:      #FFF0F0;
+  --rose-border:    #F9DEDC;
+  --rose-text:      #B3261E;
+  --border:         var(--md-outline-variant);
+  --bg:             var(--md-surface);
+
+  /* Border radius legacy */
+  --r:    var(--shape-lg);
+  --r-sm: var(--shape-md);
+  --r-lg: var(--shape-xl);
+
+  --safe-bottom: calc(
+    var(--nav-h)
+    + max(env(safe-area-inset-bottom, 0px), var(--android-nav, 0px))
+    + 12px
+  );
+}
+
+/* ── Reset & Base ──────────────────────────────── */
+*, ::before, ::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', 'Roboto', system-ui, sans-serif;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Scrollbar ─────────────────────────────────── */
+::-webkit-scrollbar        { width: 3px; }
+::-webkit-scrollbar-thumb  { background: var(--md-outline-variant); border-radius: 9px; }
+
+/* ── Page container ────────────────────────────── */
+.page-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: var(--safe-bottom);
+}
+
+/* ── Content Wrapper ───────────────────────────── */
+.wrap {
+  max-width: 580px;
+  margin: 0 auto;
+  padding: 16px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ══════════════════════════════════════════════════
+   M3 TOP APP BAR
+   ══════════════════════════════════════════════════ */
+.app-bar {
+  background: var(--md-surface-container-low);
+  border-bottom: 1px solid var(--md-outline-variant);
+  padding: 0 16px;
+  height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: var(--elevation-1);
+}
+
+.bar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bar-brand-box {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--shape-lg);
+  background: var(--md-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--md-on-primary);
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: -1px;
+}
+
+.bar-brand-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--md-on-surface);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.bar-brand-sub {
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.bar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bar-btn {
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  border-radius: var(--shape-full);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  color: var(--md-on-surface-variant);
+}
+
+.bar-btn:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+/* ══════════════════════════════════════════════════
+   M3 NAVIGATION BAR
+   ══════════════════════════════════════════════════ */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--nav-h);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--android-nav, 0px));
+  background: var(--md-surface-container-low);
+  border-top: 1px solid var(--md-outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  z-index: 50;
+  box-shadow: 0 -1px 0 var(--md-outline-variant);
+}
+
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  align-self: stretch;
+  padding: 8px 4px;
+  min-width: 0;
+}
+
+.nav-item-indicator {
+  width: 64px;
+  height: 32px;
+  border-radius: var(--shape-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  transition: background 0.2s;
+  color: var(--md-on-surface-variant);
+}
+
+.nav-item.active .nav-item-indicator {
+  background: var(--md-primary-container);
+  color: var(--md-primary);
+}
+
+.nav-item-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  letter-spacing: 0.1px;
+  line-height: 1;
+}
+
+.nav-item.active .nav-item-label {
+  color: var(--md-primary);
+  font-weight: 700;
+}
+
+/* FAB in nav */
+.nav-add {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--shape-lg);
+  border: none;
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--elevation-3);
+  transition: transform 0.2s, box-shadow 0.2s;
+  flex-shrink: 0;
+  cursor: pointer;
+  margin-top: -20px;
+}
+
+.nav-add:hover, .nav-add:active {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(11,87,208,.35);
+}
+
+/* ══════════════════════════════════════════════════
+   M3 CARDS
+   ══════════════════════════════════════════════════ */
+/* Elevated Card */
+.card {
+  background: var(--md-surface-container-lowest);
+  border-radius: var(--shape-xl);
+  box-shadow: var(--elevation-1);
+  overflow: hidden;
+}
+
+/* Filled Card */
+.card-filled {
+  background: var(--md-surface-container-high);
+  border-radius: var(--shape-xl);
+  overflow: hidden;
+}
+
+/* Outlined Card */
+.card-outlined {
+  background: var(--md-surface-container-lowest);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--shape-xl);
+  overflow: hidden;
+}
+
+/* ══════════════════════════════════════════════════
+   M3 SECTION TITLE
+   ══════════════════════════════════════════════════ */
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--md-on-surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+/* ══════════════════════════════════════════════════
+   M3 BUTTONS
+   ══════════════════════════════════════════════════ */
+/* Filled Button */
+.btn-primary {
+  width: 100%;
+  padding: 10px 24px;
+  border: none;
+  border-radius: var(--shape-full);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.1px;
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: var(--elevation-1);
+  transition: box-shadow 0.2s, background 0.15s;
+  min-height: 40px;
+}
+
+.btn-primary:hover {
+  box-shadow: var(--elevation-2);
+}
+
+.btn-primary:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Tonal Button */
+.btn-tonal {
+  padding: 10px 24px;
+  border: none;
+  border-radius: var(--shape-full);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.15s;
+  min-height: 40px;
+}
+
+/* Outlined Button */
+.btn-outlined {
+  padding: 10px 24px;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--shape-full);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  background: transparent;
+  color: var(--md-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.15s;
+  min-height: 40px;
+}
+
+/* Text Button */
+.btn-text {
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  border-radius: var(--shape-full);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--md-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ══════════════════════════════════════════════════
+   M3 EMPTY STATE
+   ══════════════════════════════════════════════════ */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 24px;
+  gap: 8px;
+}
+
+.empty-state svg {
+  color: var(--md-on-surface-variant);
+  opacity: 0.6;
+  margin-bottom: 8px;
+}
+
+.empty-state p {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--md-on-surface-variant);
+}
+
+/* ══════════════════════════════════════════════════
+   M3 ANIMATIONS
+   ══════════════════════════════════════════════════ */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes popIn {
+  from { transform: scale(0.92) translateY(8px); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ── Spinner ────────────────────────────────────── */
+.spin {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+/* ── Shimmer Skeleton ───────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--md-surface-container) 25%,
+    var(--md-surface-container-high) 50%,
+    var(--md-surface-container) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--shape-xl);
+}
+
+/* ══════════════════════════════════════════════════
+   M3 TOAST / SNACKBAR
+   ══════════════════════════════════════════════════ */
+#toast {
+  position: fixed;
+  bottom: calc(var(--nav-h) + 16px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--md-inverse-surface);
+  color: var(--md-inverse-on-surface);
+  padding: 12px 20px;
+  border-radius: var(--shape-xs);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: var(--elevation-3);
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+}
+
+#toast.show { opacity: 1; }
+
+/* ══════════════════════════════════════════════════
+   M3 INPUT FIELDS (Filled style)
+   ══════════════════════════════════════════════════ */
+.font-mono { font-family: 'DM Mono', monospace; }
+
+.field { margin-bottom: 12px; }
+
+.field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  margin-bottom: 4px;
+  letter-spacing: 0.4px;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-bottom: 1.5px solid var(--md-outline);
+  border-radius: var(--shape-md) var(--shape-md) 0 0;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--md-on-surface);
+  background: var(--md-surface-container);
+  transition: border-color 0.2s, background 0.15s;
+  outline: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-bottom-color: var(--md-primary);
+  background: var(--md-surface-container-high);
+}
+
+.field input::placeholder { color: var(--md-on-surface-variant); opacity: 0.6; }
+
+/* Rupiah prefix */
+.input-rp { position: relative; }
+.input-rp .pfx {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+  pointer-events: none;
+}
+.input-rp input { padding-left: 36px !important; }
+
+/* Hide number spinner */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+
+/* Field row 2 kolom */
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ── Qty stepper ────────────────────────────────── */
+.qty-wrap {
+  display: flex;
+  align-items: center;
+  border: none;
+  border-bottom: 1.5px solid var(--md-outline);
+  border-radius: var(--shape-md) var(--shape-md) 0 0;
+  overflow: hidden;
+  background: var(--md-surface-container);
+  transition: border-color 0.2s;
+  height: 48px;
+}
+
+.qty-wrap:focus-within { border-bottom-color: var(--md-primary); }
+
+.qty-btn {
+  width: 40px;
+  height: 48px;
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--md-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.qty-btn:hover { background: color-mix(in srgb, var(--md-primary) 8%, transparent); }
+
+.qty-wrap input {
+  flex: 1;
+  border: none !important;
+  background: transparent !important;
+  text-align: center;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: none !important;
+  padding: 0 !important;
+  height: 48px;
+  outline: 0;
+  -webkit-appearance: none;
+  color: var(--md-on-surface);
+}
+
+/* ── Filter Chips (M3) ──────────────────────────── */
+.chip-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.chip {
+  padding: 6px 16px;
+  border-radius: var(--shape-full);
+  border: 1px solid var(--md-outline);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+}
+
+.chip.active {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.chip:disabled { opacity: 0.38; cursor: not-allowed; pointer-events: none; }
+
+/* ══════════════════════════════════════════════════
+   CART TABLE
+   ══════════════════════════════════════════════════ */
+.ker-tbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
+
+.ker-tbl thead th {
+  font-size: 11px; font-weight: 600; color: var(--md-on-surface-variant);
+  letter-spacing: 0.4px;
+  padding: 8px 6px; text-align: left;
+  border-bottom: 1px solid var(--md-outline-variant);
+  background: var(--md-surface-container);
+}
+
+.ker-tbl thead th.tr  { text-align: right; }
+.ker-tbl thead th.tc  { text-align: center; }
+.ker-tbl thead th.col-nama { width: auto; }
+.ker-tbl thead th.col-qty  { width: 36px; }
+.ker-tbl thead th.col-hrg  { width: 72px; }
+.ker-tbl thead th.col-sub  { width: 80px; }
+.ker-tbl thead th.col-del  { width: 32px; }
+
+.ker-tbl tbody tr { border-bottom: 1px solid var(--md-outline-variant); }
+.ker-tbl tbody tr:last-child { border-bottom: none; }
+.ker-tbl tbody td { padding: 8px 6px; font-size: 13px; vertical-align: middle; }
+.ker-tbl .td-qty { text-align: center; font-weight: 700; font-family: 'DM Mono', monospace; }
+.ker-tbl .td-hrg { text-align: right; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--md-on-surface-variant); }
+.ker-tbl .td-sub { text-align: right; font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 700; }
+.ker-tbl .td-del { text-align: center; width: 32px; }
+.ker-tbl tfoot tr { border-top: 1px solid var(--md-outline-variant); }
+.ker-tbl tfoot td { padding: 8px 8px; font-size: 13px; }
+.ker-tbl tfoot .tf-lbl { text-align: right; color: var(--md-on-surface-variant); font-weight: 500; }
+.ker-tbl tfoot .tf-val { text-align: right; font-family: 'DM Mono', monospace; font-weight: 700; }
+.ker-tbl tfoot tr.tf-tagihan .tf-val { font-size: 16px; font-weight: 800; color: var(--md-primary); }
+
+.ker-tbl-wrap {
+  background: var(--md-surface-container-lowest);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--shape-lg);
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.ker-empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--md-on-surface-variant);
+  font-size: 14px;
+}
+
+/* ── DP block ───────────────────────────────────── */
+.dp-block {
+  background: var(--md-surface-container);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--shape-lg);
+  padding: 16px;
+}
+
+.dp-block-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.dp-input-wrap { position: relative; margin-bottom: 12px; }
+
+.dp-input {
+  width: 100%;
+  padding: 12px 16px 12px 32px;
+  border: none;
+  border-bottom: 1.5px solid var(--md-outline);
+  border-radius: var(--shape-md) var(--shape-md) 0 0;
+  font-family: 'DM Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  outline: none;
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+  text-align: right;
+  padding-right: 16px;
+}
+
+.dp-pfx {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+  pointer-events: none;
+}
+
+.dp-sisa-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--md-surface-container-high);
+  border-radius: var(--shape-md);
+}
+
+.dp-sisa-lbl { font-size: 12px; font-weight: 500; color: var(--md-on-surface-variant); }
+.dp-sisa-val { font-size: 15px; font-weight: 800; font-family: 'DM Mono', monospace; color: var(--md-error); }
+
+/* ── Copy rek button ────────────────────────────── */
+.btn-copy-rek {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 12px; border-radius: var(--shape-full);
+  border: 1px solid var(--md-outline);
+  background: transparent; font-family: inherit;
+  font-size: 12px; font-weight: 600; color: var(--md-on-surface-variant); cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-copy-rek:hover { background: var(--md-surface-container-high); }
+.btn-copy-rek.copied { background: var(--md-primary); color: var(--md-on-primary); border-color: transparent; }
+
+/* ══════════════════════════════════════════════════
+   TRANSACTION INPUT SCREEN (Full-screen modal)
+   ══════════════════════════════════════════════════ */
+.input-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--md-surface);
+  z-index: 200;
+  transform: translateY(100%);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.input-screen.open { transform: translateY(0); }
+
+.input-bar {
+  background: var(--md-surface-container-low);
+  border-bottom: 1px solid var(--md-outline-variant);
+  padding: 0 16px;
+  height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.input-bar-title { font-size: 16px; font-weight: 600; color: var(--md-on-surface); flex: 1; }
+
+.input-bar-btn {
+  width: 40px; height: 40px;
+  background: transparent;
+  border: none; border-radius: var(--shape-full); cursor: pointer;
+  color: var(--md-on-surface-variant);
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.input-bar-btn:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+
+.input-body { flex: 1; overflow-y: auto; padding: 16px; }
+
+.input-footer {
+  padding: 12px 16px;
+  background: var(--md-surface-container-low);
+  border-top: 1px solid var(--md-outline-variant);
+  flex-shrink: 0;
+}
+
+.input-total-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.input-total-lbl { font-size: 12px; font-weight: 500; color: var(--md-on-surface-variant); text-transform: uppercase; letter-spacing: 0.5px; }
+.input-total-val { font-size: 20px; font-weight: 800; font-family: 'DM Mono', monospace; color: var(--md-primary); }
+
+/* ── Item builder ───────────────────────────────── */
+.item-builder-box {
+  background: var(--md-surface-container);
+  border: 1.5px dashed var(--md-outline);
+  border-radius: var(--shape-lg);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.item-builder-box:focus-within { border-color: var(--md-primary); }
+
+.builder-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-primary);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-add-item {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--md-primary);
+  border-radius: var(--shape-full);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  background: transparent;
+  color: var(--md-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+  transition: background 0.15s;
+}
+.btn-add-item:hover { background: var(--md-primary-container); }
+
+/* ══════════════════════════════════════════════════
+   M3 STATUS BADGES
+   ══════════════════════════════════════════════════ */
+.badge-lunas {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--shape-full);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  border: none;
+}
+
+.badge-lunas.lunas {
+  background: var(--md-tertiary-container);
+  color: var(--md-on-tertiary-container);
+}
+
+.badge-lunas.belum {
+  background: var(--md-error-container);
+  color: var(--md-error);
+}
+
+.badge-lunas.dp {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+/* ══════════════════════════════════════════════════
+   M3 MODAL BOTTOM SHEET
+   ══════════════════════════════════════════════════ */
+.sheet,
+.modal,
+.dialog {
+  background: var(--md-surface-container-low);
+  border-radius: var(--shape-xl) var(--shape-xl) 0 0;
+}
+
+/* ── Drag handle ────────────────────────────────── */
+.sheet-handle {
+  width: 32px;
+  height: 4px;
+  border-radius: var(--shape-full);
+  background: var(--md-outline-variant);
+  margin: 12px auto 0;
+}
+
+/* ══════════════════════════════════════════════════
+   RECHARTS — M3 tonal
+   ══════════════════════════════════════════════════ */
+.recharts-cartesian-grid line { stroke: var(--md-outline-variant) !important; }
+.recharts-tooltip-wrapper { border-radius: var(--shape-lg) !important; }
+
+/* ══════════════════════════════════════════════════
+   M3 MICRO INTERACTIONS
+   ══════════════════════════════════════════════════ */
+button, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ripple press state */
+.pressable {
+  position: relative;
+  overflow: hidden;
+}
+
+.pressable::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--md-on-surface);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.pressable:active::after { opacity: 0.12; }
+.pressable:hover::after  { opacity: 0.08; }
