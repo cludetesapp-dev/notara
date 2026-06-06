@@ -1,3 +1,6 @@
+#!/bin/bash
+
+cat > src/features/dashboard/SummaryCards.tsx <<'FILE'
 import { formatRupiah } from '@/utils/formatters'
 
 interface SummaryCardsProps {
@@ -135,3 +138,6 @@ export function SummaryCards({
     </div>
   )
 }
+FILE
+
+echo "SummaryCards Material 3 installed"
