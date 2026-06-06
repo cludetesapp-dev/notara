@@ -1,11 +1,18 @@
-import { m3 } from '@/theme/material3'
-
 interface TopBarProps {
-  title: string
+  isOnline?: boolean
+  isSyncing?: boolean
+  hasFailed?: boolean
+  onPrintNota?: () => void
+
+  title?: string
   subtitle?: string
 }
 
 export function TopBar({
+  isOnline,
+  isSyncing,
+  hasFailed,
+  onPrintNota,
   title,
   subtitle,
 }: TopBarProps) {
@@ -15,36 +22,68 @@ export function TopBar({
         position: 'sticky',
         top: 0,
         zIndex: 20,
-
-        background: m3.color.surface,
-
-        backdropFilter: 'blur(12px)',
-
-        borderBottom: `1px solid ${m3.color.outline}`,
-
-        padding: '20px 20px 16px',
+        background: '#FEFBFF',
+        borderBottom: '1px solid #D0D7E2',
+        padding: '16px 20px',
       }}
     >
-      <div
-        style={{
-          fontSize: 28,
-          fontWeight: 700,
-          color: m3.color.onSurface,
-          lineHeight: 1.2,
-        }}
-      >
-        {title}
-      </div>
+      {title && (
+        <div
+          style={{
+            fontSize: 28,
+            fontWeight: 700,
+            marginBottom: 4,
+          }}
+        >
+          {title}
+        </div>
+      )}
 
       {subtitle && (
         <div
           style={{
-            marginTop: 4,
             fontSize: 13,
-            color: m3.color.onSurfaceVariant,
+            color: '#5F6368',
+            marginBottom: 8,
           }}
         >
           {subtitle}
+        </div>
+      )}
+
+      {(isOnline !== undefined ||
+        isSyncing !== undefined ||
+        hasFailed !== undefined) && (
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            alignItems: 'center',
+          }}
+        >
+          <span>
+            {hasFailed
+              ? 'Sync Failed'
+              : isSyncing
+              ? 'Syncing...'
+              : isOnline
+              ? 'Online'
+              : 'Offline'}
+          </span>
+
+          {onPrintNota && (
+            <button
+              onClick={onPrintNota}
+              style={{
+                border: 0,
+                padding: '8px 12px',
+                borderRadius: 12,
+                cursor: 'pointer',
+              }}
+            >
+              Print
+            </button>
+          )}
         </div>
       )}
     </header>
