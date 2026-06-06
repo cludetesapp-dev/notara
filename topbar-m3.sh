@@ -1,3 +1,6 @@
+#!/bin/bash
+
+cat > src/components/layout/TopBar.tsx <<'FILE'
 import { Printer, Settings } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { SyncBadge } from '@/components/shared/SyncBadge'
@@ -118,3 +121,6 @@ export function TopBar({
     </header>
   )
 }
+FILE
+
+echo "TopBar Material 3 installed"

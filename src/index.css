@@ -853,3 +853,44 @@ input[type="search"]{
     color .15s ease;
 }
 
+
+/* ==========================
+   MATERIAL 3 GOOGLE BLUE
+   ========================== */
+
+:root{
+  --m3-primary:#0B57D0;
+  --m3-primary-container:#D3E3FD;
+  --m3-surface:#F8FAFD;
+  --m3-surface-container:#EEF3FD;
+  --m3-outline:#DADCE0;
+  --m3-text:#1F1F1F;
+}
+
+.bar-brand-box{
+  background:#0B57D0 !important;
+  border-radius:16px !important;
+}
+
+.bottom-nav{
+  background:#fff !important;
+  border-top:1px solid #DADCE0 !important;
+}
+
+.nav-item.active{
+  background:#D3E3FD !important;
+  border-radius:999px !important;
+  color:#0B57D0 !important;
+}
+
+.nav-item.active svg{
+  padding:0 !important;
+  transform:none !important;
+}
+
+.nav-add{
+  background:#0B57D0 !important;
+  border-radius:18px !important;
+  color:#fff !important;
+}
+
