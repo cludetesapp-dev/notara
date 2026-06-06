@@ -1,112 +1,3 @@
-===== BottomNav =====
-import { useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, ArrowLeftRight, Plus, Package, Menu } from 'lucide-react'
-
-interface BottomNavProps {
-  onAdd?:  () => void
-  onMenu?: () => void
-}
-
-export function BottomNav({ onAdd, onMenu }: BottomNavProps) {
-  const navigate   = useNavigate()
-  const { pathname } = useLocation()
-  const active = (p: string) => p === '/' ? pathname === '/' : pathname.startsWith(p)
-
-  return (
-    <nav className="bottom-nav">
-      <button className={`nav-item${active('/') ? ' active' : ''}`}
-        onClick={() => navigate('/')} aria-label="Dashboard">
-        <LayoutDashboard size={20} />
-        <span className="nav-item-label">Dashboard</span>
-      </button>
-
-      <button className={`nav-item${active('/transactions') ? ' active' : ''}`}
-        onClick={() => navigate('/transactions')} aria-label="Transaksi">
-        <ArrowLeftRight size={20} />
-        <span className="nav-item-label">Transaksi</span>
-      </button>
-
-      <button className="nav-add" onClick={onAdd} aria-label="Tambah transaksi">
-        <Plus size={24} strokeWidth={2.5} />
-      </button>
-
-      <button className={`nav-item${active('/products') ? ' active' : ''}`}
-        onClick={() => navigate('/products')} aria-label="Barang">
-        <Package size={20} />
-        <span className="nav-item-label">Barang</span>
-      </button>
-
-      <button className="nav-item" onClick={onMenu} aria-label="Menu">
-        <Menu size={20} />
-        <span className="nav-item-label">Menu</span>
-      </button>
-    </nav>
-  )
-}
-
-===== TopBar =====
-// ═══════════════════════════════════════════════════
-// components/layout/TopBar.tsx
-// ═══════════════════════════════════════════════════
-
-import { Printer, Settings } from 'lucide-react'
-import { useNavigate }       from 'react-router-dom'
-import { SyncBadge }         from '@/components/shared/SyncBadge'
-
-interface TopBarProps {
-  isOnline?:    boolean
-  isSyncing?:   boolean
-  hasFailed?:   boolean
-  onPrintNota?: () => void
-}
-
-export function TopBar({
-  isOnline   = true,
-  isSyncing  = false,
-  hasFailed  = false,
-  onPrintNota,
-}: TopBarProps) {
-  const navigate = useNavigate()
-
-  return (
-    <header className="app-bar">
-      {/* Brand */}
-      <div className="bar-brand">
-        <div className="bar-brand-box">
-          <svg width="18" height="18" viewBox="0 0 36 36" fill="none">
-            <path d="M6 30V6l18 18V6" stroke="white" strokeWidth="3.5"
-              strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-        <div>
-          <div className="bar-brand-name">NOTARA</div>
-          <div className="bar-brand-sub">Nota &amp; Arsip Digital</div>
-        </div>
-      </div>
-
-      {/* Right actions */}
-      <div className="bar-right">
-        <SyncBadge
-          isOnline={isOnline}
-          isSyncing={isSyncing}
-          hasFailed={hasFailed}
-        />
-
-        <button className="bar-btn" onClick={onPrintNota} aria-label="Cetak Nota">
-          <Printer size={16} />
-        </button>
-
-        <button className="bar-btn" onClick={() => navigate('/settings')} aria-label="Pengaturan">
-          <Settings size={16} />
-        </button>
-      </div>
-    </header>
-  )
-}
-
-===== Global CSS =====
-
-===== src/index.css =====
 /* ── Google Fonts sudah di-load via index.html ── */
 
 /* ═══════════════════════════════════════════════
@@ -747,3 +638,127 @@ input[type=number] { -moz-appearance: textfield; }
 .badge-lunas.lunas { background: #bbf7d0; color: #15803d; }
 .badge-lunas.belum { background: #fecdd3; color: #be123c; }
 .badge-lunas.dp    { background: #fed7aa; color: #c2410c; }
+
+/* ==========================================
+   MATERIAL 3 OVERRIDE - NOTARA
+   ========================================== */
+
+:root{
+  --primary:#0B57D0;
+  --primary-container:#D3E3FD;
+  --surface:#F8FAFD;
+  --surface-container:#EDF2FA;
+  --surface-high:#E8F0FE;
+  --outline:#D2D8E3;
+  --text-primary:#1F1F1F;
+  --text-secondary:#5F6368;
+
+  --r:16px;
+  --r-lg:28px;
+}
+
+body{
+  background:var(--surface)!important;
+  color:var(--text-primary)!important;
+}
+
+/* Top Bar */
+
+.app-bar{
+  background:var(--surface)!important;
+  border-bottom:1px solid var(--outline)!important;
+  box-shadow:none!important;
+}
+
+.bar-brand-name{
+  color:var(--text-primary)!important;
+}
+
+.bar-brand-sub{
+  color:var(--text-secondary)!important;
+}
+
+.bar-brand-box{
+  background:var(--primary)!important;
+  border-radius:14px!important;
+}
+
+.bar-btn{
+  background:var(--surface-container)!important;
+  color:var(--text-primary)!important;
+  border:none!important;
+  border-radius:14px!important;
+}
+
+/* Bottom Nav */
+
+.bottom-nav{
+  background:var(--surface)!important;
+  border-top:1px solid var(--outline)!important;
+  box-shadow:none!important;
+}
+
+.nav-item{
+  color:var(--text-secondary)!important;
+}
+
+.nav-item.active{
+  color:var(--primary)!important;
+}
+
+.nav-item.active svg{
+  background:var(--primary-container)!important;
+  border-radius:999px!important;
+  padding:6px!important;
+}
+
+.nav-add{
+  background:var(--primary)!important;
+  border-radius:16px!important;
+  width:56px!important;
+  height:56px!important;
+  box-shadow:0 4px 12px rgba(11,87,208,.25)!important;
+}
+
+/* Cards */
+
+.dashboard-card,
+.stat-card{
+  background:white!important;
+  border:1px solid var(--outline)!important;
+  border-radius:24px!important;
+  box-shadow:0 1px 2px rgba(0,0,0,.04)!important;
+}
+
+/* Inputs */
+
+.field input,
+.field select,
+.field textarea{
+  background:white!important;
+  border:1px solid var(--outline)!important;
+  border-radius:16px!important;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus{
+  border-color:var(--primary)!important;
+  box-shadow:0 0 0 4px rgba(11,87,208,.12)!important;
+}
+
+/* Buttons */
+
+.btn-primary{
+  background:var(--primary)!important;
+  border:none!important;
+  border-radius:20px!important;
+}
+
+/* Toast */
+
+#toast{
+  background:#202124!important;
+  border-radius:20px!important;
+}
+

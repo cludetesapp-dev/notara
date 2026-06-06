@@ -1,0 +1,635 @@
+// ═══════════════════════════════════════════════════
+// components/layout/TopBar.tsx
+// ═══════════════════════════════════════════════════
+
+import { Printer, Settings } from 'lucide-react'
+import { useNavigate }       from 'react-router-dom'
+import { SyncBadge }         from '@/components/shared/SyncBadge'
+
+interface TopBarProps {
+  isOnline?:    boolean
+  isSyncing?:   boolean
+  hasFailed?:   boolean
+  onPrintNota?: () => void
+}
+
+export function TopBar({
+  isOnline   = true,
+  isSyncing  = false,
+  hasFailed  = false,
+  onPrintNota,
+}: TopBarProps) {
+  const navigate = useNavigate()
+
+  return (
+    <header className="app-bar">
+      {/* Brand */}
+      <div className="bar-brand">
+        <div className="bar-brand-box">
+          <svg width="18" height="18" viewBox="0 0 36 36" fill="none">
+            <path d="M6 30V6l18 18V6" stroke="white" strokeWidth="3.5"
+              strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <div>
+          <div className="bar-brand-name">NOTARA</div>
+          <div className="bar-brand-sub">Nota &amp; Arsip Digital</div>
+        </div>
+      </div>
+
+      {/* Right actions */}
+      <div className="bar-right">
+        <SyncBadge
+          isOnline={isOnline}
+          isSyncing={isSyncing}
+          hasFailed={hasFailed}
+        />
+
+        <button className="bar-btn" onClick={onPrintNota} aria-label="Cetak Nota">
+          <Printer size={16} />
+        </button>
+
+        <button className="bar-btn" onClick={() => navigate('/settings')} aria-label="Pengaturan">
+          <Settings size={16} />
+        </button>
+      </div>
+    </header>
+  )
+}
+
+import { useNavigate, useLocation } from 'react-router-dom'
+import { LayoutDashboard, ArrowLeftRight, Plus, Package, Menu } from 'lucide-react'
+
+interface BottomNavProps {
+  onAdd?:  () => void
+  onMenu?: () => void
+}
+
+export function BottomNav({ onAdd, onMenu }: BottomNavProps) {
+  const navigate   = useNavigate()
+  const { pathname } = useLocation()
+  const active = (p: string) => p === '/' ? pathname === '/' : pathname.startsWith(p)
+
+  return (
+    <nav className="bottom-nav">
+      <button className={`nav-item${active('/') ? ' active' : ''}`}
+        onClick={() => navigate('/')} aria-label="Dashboard">
+        <LayoutDashboard size={20} />
+        <span className="nav-item-label">Dashboard</span>
+      </button>
+
+      <button className={`nav-item${active('/transactions') ? ' active' : ''}`}
+        onClick={() => navigate('/transactions')} aria-label="Transaksi">
+        <ArrowLeftRight size={20} />
+        <span className="nav-item-label">Transaksi</span>
+      </button>
+
+      <button className="nav-add" onClick={onAdd} aria-label="Tambah transaksi">
+        <Plus size={24} strokeWidth={2.5} />
+      </button>
+
+      <button className={`nav-item${active('/products') ? ' active' : ''}`}
+        onClick={() => navigate('/products')} aria-label="Barang">
+        <Package size={20} />
+        <span className="nav-item-label">Barang</span>
+      </button>
+
+      <button className="nav-item" onClick={onMenu} aria-label="Menu">
+        <Menu size={20} />
+        <span className="nav-item-label">Menu</span>
+      </button>
+    </nav>
+  )
+}
+
+import { useNavigate } from 'react-router-dom'
+import { Users, BarChart2, Settings, Download, Trash2, X } from 'lucide-react'
+
+interface Props {
+  open:    boolean
+  onClose: () => void
+}
+
+const MENU_ITEMS = [
+  { icon: <Users size={20} />,    label: 'Mitra',      sub: 'Supplier & Customer', path: '/partners' },
+  { icon: <BarChart2 size={20} />, label: 'Laporan',    sub: 'Harian, bulanan, tahunan', path: '/reports' },
+  { icon: <Settings size={20} />, label: 'Pengaturan', sub: 'Profil toko, rekening', path: '/settings' },
+  { icon: <Download size={20} />, label: 'Backup',     sub: 'Export & import data', path: '/backup' },
+  { icon: <Trash2 size={20} />,   label: 'Arsip',      sub: 'Transaksi terhapus', path: '/trash' },
+]
+
+export function MenuSheet({ open, onClose }: Props) {
+  const navigate = useNavigate()
+  if (!open) return null
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div onClick={onClose} style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+        zIndex: 100, backdropFilter: 'blur(2px)',
+      }} />
+
+      {/* Sheet */}
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        background: '#fff', borderRadius: '20px 20px 0 0',
+        zIndex: 101, padding: '0 0 32px',
+        animation: 'slideUpSheet .28s cubic-bezier(.4,0,.2,1)',
+      }}>
+        {/* Handle */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 8px' }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: '#e5e7eb', margin: '0 auto' }} />
+        </div>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px 12px' }}>
+          <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--soil)' }}>Menu</span>
+          <button onClick={onClose} style={{
+            width: 30, height: 30, borderRadius: 8, border: 'none',
+            background: '#f1f5f1', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <X size={16} color="var(--clay)" />
+          </button>
+        </div>
+
+        {/* Items */}
+        {MENU_ITEMS.map(item => (
+          <button key={item.path} onClick={() => { navigate(item.path); onClose() }}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 14,
+              padding: '12px 16px', border: 'none', background: 'none',
+              cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+              borderBottom: '1px solid #f5f5f5', transition: 'background .15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--green-pale)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          >
+            <div style={{
+              width: 40, height: 40, borderRadius: 12,
+              background: 'var(--green-pale)', border: '1.5px solid var(--green-muted)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--green)', flexShrink: 0,
+            }}>
+              {item.icon}
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--soil)' }}>{item.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{item.sub}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <style>{`
+        @keyframes slideUpSheet {
+          from { transform: translateY(100%); }
+          to   { transform: translateY(0); }
+        }
+      `}</style>
+    </>
+  )
+}
+
+import { TrendingUp, ShoppingBag, Package, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { formatRupiahCompact, formatRupiah } from '@/utils/format'
+import type { DailyStats, MonthlyStats, ReceivablePayable } from './useDashboardData'
+
+interface Props {
+  today: DailyStats
+  month: MonthlyStats
+  rp:    ReceivablePayable
+}
+
+export function SummaryCards({ today, month, rp }: Props) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+
+      {/* Omset Hero Card — farm-v4 style gradient */}
+      <div
+        style={{
+          background: 'linear-gradient(135deg, var(--green) 0%, var(--green-mid) 60%, #16a34a 100%)',
+          borderRadius: 'var(--r-lg)',
+          padding: '20px',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        {/* decorative circles */}
+        <div style={{ position:'absolute', right:-30, bottom:-30, width:120, height:120, borderRadius:'50%', background:'rgba(255,255,255,0.07)' }} />
+        <div style={{ position:'absolute', right:40, top:-20, width:70, height:70, borderRadius:'50%', background:'rgba(255,255,255,0.05)' }} />
+
+        <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.65)', textTransform:'uppercase', letterSpacing:'0.6px', marginBottom:6 }}>
+          Omset Hari Ini
+        </div>
+        <div style={{ fontSize:28, fontWeight:900, color:'#fff', fontFamily:'DM Mono, monospace', position:'relative', zIndex:1 }}>
+          {formatRupiahCompact(today.omset)}
+        </div>
+        <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginTop:4, fontWeight:600 }}>
+          Bulan ini: {formatRupiahCompact(month.omset)} &nbsp;·&nbsp; {month.txCount} transaksi
+        </div>
+      </div>
+
+      {/* 2 stat cards — grid 2 kolom */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+        <StatCard
+          icon={<TrendingUp size={16} color="var(--green)" />}
+          label="Laba Hari Ini"
+          value={formatRupiahCompact(today.profit)}
+          sub={`Bulan: ${formatRupiahCompact(month.profit)}`}
+          accentColor="var(--green)"
+        />
+
+        <StatCard
+          icon={<ShoppingBag size={16} color="var(--green)" />}
+          label="Transaksi"
+          value={String(today.txCount)}
+          sub={`Bulan: ${month.txCount} nota`}
+          accentColor="var(--green)"
+          valueMono={false}
+        />
+      </div>
+
+      {/* Pembelian hari ini — full width */}
+      <StatCard
+        icon={<Package size={16} color="var(--amber)" />}
+        label="Pembelian Hari Ini"
+        value={formatRupiah(today.purchase)}
+        sub="Total pengeluaran ke supplier"
+        accentColor="var(--amber)"
+        fullWidth
+      />
+
+      {/* Piutang & Utang — 2 kolom */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+
+        {/* Piutang — customer masih utang ke kita */}
+        <div
+          style={{
+            background: rp.totalPiutang > 0 ? '#f0fdf4' : '#fff',
+            borderRadius: 'var(--r)',
+            padding: '12px 14px',
+            border: rp.totalPiutang > 0 ? '1.5px solid var(--green-border, #bbf7d0)' : '1.5px solid #e8f0e8',
+          }}
+        >
+          <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:6 }}>
+            <CheckCircle2 size={14} color="var(--green)" />
+            <div style={{ fontSize:9.5, fontWeight:700, color:'var(--stone)', textTransform:'uppercase', letterSpacing:'0.5px' }}>
+              Piutang
+            </div>
+          </div>
+          <div style={{ fontSize:16, fontWeight:900, color: rp.totalPiutang > 0 ? 'var(--green)' : 'var(--stone)', fontFamily:'DM Mono, monospace' }}>
+            {rp.totalPiutang > 0 ? formatRupiahCompact(rp.totalPiutang) : '—'}
+          </div>
+          <div style={{ fontSize:9, color:'var(--stone)', marginTop:3, fontWeight:600 }}>
+            {rp.countPiutang > 0 ? `${rp.countPiutang} nota belum lunas` : 'Semua sudah lunas'}
+          </div>
+        </div>
+
+        {/* Utang — kita masih utang ke supplier */}
+        <div
+          style={{
+            background: rp.totalUtang > 0 ? '#fff9f0' : '#fff',
+            borderRadius: 'var(--r)',
+            padding: '12px 14px',
+            border: rp.totalUtang > 0 ? '1.5px solid #fed7aa' : '1.5px solid #e8f0e8',
+          }}
+        >
+          <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:6 }}>
+            <AlertCircle size={14} color="var(--amber)" />
+            <div style={{ fontSize:9.5, fontWeight:700, color:'var(--stone)', textTransform:'uppercase', letterSpacing:'0.5px' }}>
+              Utang
+            </div>
+          </div>
+          <div style={{ fontSize:16, fontWeight:900, color: rp.totalUtang > 0 ? 'var(--amber)' : 'var(--stone)', fontFamily:'DM Mono, monospace' }}>
+            {rp.totalUtang > 0 ? formatRupiahCompact(rp.totalUtang) : '—'}
+          </div>
+          <div style={{ fontSize:9, color:'var(--stone)', marginTop:3, fontWeight:600 }}>
+            {rp.countUtang > 0 ? `${rp.countUtang} nota belum lunas` : 'Tidak ada utang'}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
+// ─── Sub-component ────────────────────────────────────────────
+interface StatCardProps {
+  icon:         React.ReactNode
+  label:        string
+  value:        string
+  sub:          string
+  accentColor:  string
+  fullWidth?:   boolean
+  valueMono?:   boolean
+}
+
+function StatCard({ icon, label, value, sub, accentColor: _accentColor, fullWidth, valueMono = true }: StatCardProps) {
+  return (
+    <div
+      style={{
+        background: '#fff',
+        borderRadius: 'var(--r)',
+        padding: '12px 14px',
+        border: '1.5px solid #e8f0e8',
+        gridColumn: fullWidth ? '1 / -1' : undefined,
+        display: fullWidth ? 'flex' : 'block',
+        alignItems: fullWidth ? 'center' : undefined,
+        gap: fullWidth ? 12 : undefined,
+      }}
+    >
+      <div style={{ marginBottom: fullWidth ? 0 : 6 }}>{icon}</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--stone)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
+          {label}
+        </div>
+        <div style={{ fontSize: fullWidth ? 15 : 17, fontWeight: 900, color: 'var(--soil)', fontFamily: valueMono ? 'DM Mono, monospace' : undefined }}>
+          {value}
+        </div>
+        <div style={{ fontSize: 9, color: 'var(--stone)', marginTop: 2, fontWeight: 600 }}>
+          {sub}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Legend,
+} from 'recharts'
+import type { TrendPoint } from './useDashboardData'
+import { formatRupiahCompact } from '@/utils/format'
+
+interface Props {
+  data: TrendPoint[]
+}
+
+// Custom tooltip agar rupiah-friendly
+function CustomTooltip({ active, payload, label }: {
+  active?:  boolean
+  payload?: { name: string; value: number; color: string }[]
+  label?:   string
+}) {
+  if (!active || !payload?.length) return null
+  return (
+    <div style={{
+      background: 'var(--soil)',
+      borderRadius: 10,
+      padding: '8px 12px',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+    }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>{label}</div>
+      {payload.map(p => (
+        <div key={p.name} style={{ fontSize: 11, fontWeight: 800, color: p.color, fontFamily: 'DM Mono, monospace' }}>
+          {p.name}: {formatRupiahCompact(p.value)}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function TrendChart({ data }: Props) {
+  const isEmpty = data.every(d => d.omset === 0 && d.profit === 0)
+
+  return (
+    <div
+      style={{
+        background: '#fff',
+        borderRadius: 'var(--r-lg)',
+        padding: '14px 14px 10px',
+        border: '1.5px solid #e8f0e8',
+        marginBottom: 12,
+      }}
+    >
+      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--clay)', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 12 }}>
+        Omset 7 Hari Terakhir
+      </div>
+
+      {isEmpty ? (
+        <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--stone)', fontSize: 12, fontWeight: 600 }}>
+          Belum ada transaksi
+        </div>
+      ) : (
+        <div style={{ height: 130 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} barCategoryGap="30%" barGap={2}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f5f0" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10, fontWeight: 700, fill: 'var(--stone)' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tickFormatter={v => formatRupiahCompact(v as number)}
+                tick={{ fontSize: 9, fill: 'var(--stone)' }}
+                axisLine={false}
+                tickLine={false}
+                width={46}
+              />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(22,101,52,0.05)' }} />
+              <Legend
+                wrapperStyle={{ fontSize: 10, fontWeight: 700, paddingTop: 6 }}
+                formatter={(v) => v === 'omset' ? 'Omset' : 'Laba'}
+              />
+              <Bar dataKey="omset"  fill="#4ade80" radius={[4, 4, 0, 0]} name="omset" />
+              <Bar dataKey="profit" fill="#166534" radius={[4, 4, 0, 0]} name="profit" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  )
+}
+
+import { Package } from 'lucide-react'
+import { formatRupiahCompact } from '@/utils/format'
+import type { TopProduct } from './useDashboardData'
+
+interface Props {
+  products: TopProduct[]
+}
+
+const RANK_COLORS = ['#166534', '#15803d', '#16a34a', '#4ade80', '#86efac']
+
+export function TopProducts({ products }: Props) {
+  return (
+    <div
+      style={{
+        background: '#fff',
+        borderRadius: 'var(--r-lg)',
+        border: '1.5px solid #e8f0e8',
+        marginBottom: 12,
+        overflow: 'hidden',
+      }}
+    >
+      <div style={{ padding: '12px 14px 4px', fontSize: 11, fontWeight: 800, color: 'var(--clay)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+        Top Produk Bulan Ini
+      </div>
+
+      {products.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--stone)', fontSize: 12, fontWeight: 600 }}>
+          Belum ada penjualan
+        </div>
+      ) : (
+        <div style={{ padding: '4px 14px 12px' }}>
+          {products.map((p, i) => (
+            <div
+              key={p.productId}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '9px 0',
+                borderBottom: i < products.length - 1 ? '1px dashed #f0f5f0' : 'none',
+              }}
+            >
+              {/* Rank badge */}
+              <div style={{
+                width: 20, height: 20, borderRadius: 6,
+                background: 'var(--green-pale)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, fontWeight: 800, color: 'var(--green)', flexShrink: 0,
+              }}>
+                {i + 1}
+              </div>
+
+              {/* Product icon */}
+              <div style={{
+                width: 28, height: 28, borderRadius: 9,
+                background: RANK_COLORS[i] + '20',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <Package size={14} color={RANK_COLORS[i]} />
+              </div>
+
+              {/* Name + qty */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--soil)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {p.productName}
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--stone)', fontWeight: 600 }}>
+                  {p.qty} {p.unit}
+                </div>
+              </div>
+
+              {/* Omset */}
+              <div style={{ fontSize: 11.5, fontWeight: 800, fontFamily: 'DM Mono, monospace', color: 'var(--green)', flexShrink: 0 }}>
+                {formatRupiahCompact(p.omset)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+import { ArrowUpRight, ArrowDownLeft } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { formatRupiah, formatDate } from '@/utils/format'
+import type { RecentTx } from './useDashboardData'
+
+interface Props {
+  transactions: RecentTx[]
+}
+
+export function RecentTransactions({ transactions }: Props) {
+  const navigate = useNavigate()
+
+  return (
+    <div
+      style={{
+        background: '#fff',
+        borderRadius: 'var(--r-lg)',
+        border: '1.5px solid #e8f0e8',
+        marginBottom: 12,
+        overflow: 'hidden',
+      }}
+    >
+      <div style={{
+        padding: '12px 14px 8px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--clay)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+          Transaksi Terbaru
+        </div>
+        <button
+          onClick={() => navigate('/transactions')}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: 10, fontWeight: 700, color: 'var(--green)',
+            padding: '2px 0',
+          }}
+        >
+          Lihat semua
+        </button>
+      </div>
+
+      {transactions.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--stone)', fontSize: 12, fontWeight: 600 }}>
+          Belum ada transaksi
+        </div>
+      ) : (
+        <div style={{ padding: '0 14px 12px' }}>
+          {transactions.map((tx, i) => {
+            const isSale = tx.type === 'SALE'
+            return (
+              <div
+                key={tx.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '9px 0',
+                  borderBottom: i < transactions.length - 1 ? '1px dashed #f0f5f0' : 'none',
+                  cursor: 'pointer',
+                }}
+                onClick={() => navigate('/transactions')}
+              >
+                {/* Type icon */}
+                <div style={{
+                  width: 34, height: 32, borderRadius: 10, flexShrink: 0,
+                  background: isSale ? 'var(--green)' : 'var(--amber-pale)',
+                  border: isSale ? 'none' : '1.5px solid var(--amber-border)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {isSale
+                    ? <ArrowUpRight size={16} color="#fff" />
+                    : <ArrowDownLeft size={16} color="var(--amber)" />
+                  }
+                </div>
+
+                {/* Partner + code */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--soil)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {tx.partnerName}
+                  </div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--stone)', marginTop: 1 }}>
+                    {tx.code} · {formatDate(tx.date)}
+                  </div>
+                </div>
+
+                {/* Total */}
+                <div style={{
+                  fontSize: 13, fontWeight: 900,
+                  fontFamily: 'DM Mono, monospace',
+                  color: isSale ? 'var(--green)' : 'var(--amber)',
+                  flexShrink: 0,
+                }}>
+                  {isSale ? '+' : '−'}{formatRupiah(tx.total)}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
