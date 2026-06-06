@@ -1,130 +1,159 @@
-import { useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
-  ArrowLeftRight,
-  Plus,
   Package,
-  Menu
+  Receipt,
+  Menu,
+  Plus,
 } from 'lucide-react'
 
+import { m3 } from '@/theme/material3'
+
 interface BottomNavProps {
-  onAdd?: () => void
-  onMenu?: () => void
+  activeTab: string
+  onChange: (tab: string) => void
+  onQuickAdd?: () => void
 }
 
-export function BottomNav({
-  onAdd,
-  onMenu,
-}: BottomNavProps) {
-  const navigate = useNavigate()
-  const { pathname } = useLocation()
-
-  const active = (path: string) =>
-    path === '/'
-      ? pathname === '/'
-      : pathname.startsWith(path)
-
-  const navStyle = (
-    isActive: boolean
-  ): React.CSSProperties => ({
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    flex: 1,
-    border: 'none',
-    background: isActive
-      ? '#D3E3FD'
-      : 'transparent',
-    color: isActive
-      ? '#0B57D0'
-      : '#5F6368',
-    borderRadius: 999,
-    padding: '10px 12px',
-    transition: 'all .15s ease',
-    fontWeight: isActive ? 700 : 500,
-  })
-
+function Item({
+  active,
+  label,
+  icon,
+  onClick,
+}: {
+  active: boolean
+  label: string
+  icon: React.ReactNode
+  onClick: () => void
+}) {
   return (
-    <nav
-      className="bottom-nav"
+    <button
+      onClick={onClick}
       style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 72,
-        background: '#fff',
-        borderTop: '1px solid #E8EAED',
+        border: 'none',
+        background: 'transparent',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 12px',
-        zIndex: 999,
+        gap: 4,
+        cursor: 'pointer',
       }}
     >
-      <button
-        style={navStyle(active('/'))}
-        onClick={() => navigate('/')}
-      >
-        <LayoutDashboard size={20} />
-        <span style={{ fontSize: 11 }}>
-          Dashboard
-        </span>
-      </button>
-
-      <button
-        style={navStyle(active('/transactions'))}
-        onClick={() => navigate('/transactions')}
-      >
-        <ArrowLeftRight size={20} />
-        <span style={{ fontSize: 11 }}>
-          Transaksi
-        </span>
-      </button>
-
-      <button
-        className="nav-add"
-        onClick={onAdd}
-        aria-label="Tambah"
+      <div
         style={{
           width: 56,
-          height: 56,
-          borderRadius: 18,
-          border: 'none',
-          background: '#0B57D0',
-          color: '#fff',
+          height: 32,
+          borderRadius: 999,
+
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow:
-            '0 4px 12px rgba(11,87,208,.25)',
-          marginTop: -20,
+
+          background: active
+            ? m3.color.surfaceContainerHigh
+            : 'transparent',
         }}
       >
-        <Plus size={24} />
+        {icon}
+      </div>
+
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: active ? 600 : 500,
+          color: m3.color.onSurface,
+        }}
+      >
+        {label}
+      </span>
+    </button>
+  )
+}
+
+export function BottomNav({
+  activeTab,
+  onChange,
+  onQuickAdd,
+}: BottomNavProps) {
+  return (
+    <>
+      <button
+        onClick={() => onQuickAdd?.()}
+        style={{
+          position: 'fixed',
+          bottom: 88,
+          left: '50%',
+          transform: 'translateX(-50%)',
+
+          width: 64,
+          height: 64,
+
+          border: 'none',
+          borderRadius: 20,
+
+          background: m3.color.primary,
+          color: '#fff',
+
+          boxShadow:
+            '0 8px 24px rgba(11,87,208,.28)',
+
+          zIndex: 50,
+          cursor: 'pointer',
+        }}
+      >
+        <Plus size={28} />
       </button>
 
-      <button
-        style={navStyle(active('/products'))}
-        onClick={() => navigate('/products')}
-      >
-        <Package size={20} />
-        <span style={{ fontSize: 11 }}>
-          Barang
-        </span>
-      </button>
+      <nav
+        style={{
+          position: 'fixed',
+          left: 0,
+          right: 0,
+          bottom: 0,
 
-      <button
-        style={navStyle(false)}
-        onClick={onMenu}
+          height: 80,
+
+          background: m3.color.surface,
+
+          borderTop:
+            `1px solid ${m3.color.outline}`,
+
+          display: 'flex',
+          justifyContent: 'space-around',
+          alignItems: 'center',
+
+          zIndex: 40,
+        }}
       >
-        <Menu size={20} />
-        <span style={{ fontSize: 11 }}>
-          Menu
-        </span>
-      </button>
-    </nav>
+        <Item
+          active={activeTab === 'dashboard'}
+          label="Dashboard"
+          icon={<LayoutDashboard size={20} />}
+          onClick={() => onChange('dashboard')}
+        />
+
+        <Item
+          active={activeTab === 'products'}
+          label="Barang"
+          icon={<Package size={20} />}
+          onClick={() => onChange('products')}
+        />
+
+        <div style={{ width: 64 }} />
+
+        <Item
+          active={activeTab === 'transactions'}
+          label="Transaksi"
+          icon={<Receipt size={20} />}
+          onClick={() => onChange('transactions')}
+        />
+
+        <Item
+          active={activeTab === 'menu'}
+          label="Menu"
+          icon={<Menu size={20} />}
+          onClick={() => onChange('menu')}
+        />
+      </nav>
+    </>
   )
 }

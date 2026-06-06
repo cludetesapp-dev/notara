@@ -1,120 +1,52 @@
-import { Printer, Settings } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
-import { SyncBadge } from '@/components/shared/SyncBadge'
+import { m3 } from '@/theme/material3'
 
 interface TopBarProps {
-  isOnline?: boolean
-  isSyncing?: boolean
-  hasFailed?: boolean
-  onPrintNota?: () => void
+  title: string
+  subtitle?: string
 }
 
 export function TopBar({
-  isOnline = true,
-  isSyncing = false,
-  hasFailed = false,
-  onPrintNota,
+  title,
+  subtitle,
 }: TopBarProps) {
-  const navigate = useNavigate()
-
   return (
     <header
-      className="app-bar"
       style={{
-        background: '#fff',
-        borderBottom: '1px solid #E8EAED',
-        padding: '12px 16px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
         position: 'sticky',
         top: 0,
-        zIndex: 50,
+        zIndex: 20,
+
+        background: m3.color.surface,
+
+        backdropFilter: 'blur(12px)',
+
+        borderBottom: `1px solid ${m3.color.outline}`,
+
+        padding: '20px 20px 16px',
       }}
     >
       <div
-        className="bar-brand"
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
+          fontSize: 28,
+          fontWeight: 700,
+          color: m3.color.onSurface,
+          lineHeight: 1.2,
         }}
       >
+        {title}
+      </div>
+
+      {subtitle && (
         <div
-          className="bar-brand-box"
           style={{
-            width: 40,
-            height: 40,
-            borderRadius: 14,
-            background: '#0B57D0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            fontWeight: 800,
-            fontSize: 22,
-            letterSpacing: '-1px',
-            boxShadow: '0 2px 8px rgba(11,87,208,.18)',
+            marginTop: 4,
+            fontSize: 13,
+            color: m3.color.onSurfaceVariant,
           }}
         >
-          N
+          {subtitle}
         </div>
-
-        <div>
-          <div
-            className="bar-brand-name"
-            style={{
-              fontWeight: 700,
-              fontSize: 18,
-              color: '#1F1F1F',
-              letterSpacing: '-0.02em',
-            }}
-          >
-            NOTARA
-          </div>
-
-          <div
-            className="bar-brand-sub"
-            style={{
-              fontSize: 12,
-              color: '#5F6368',
-            }}
-          >
-            Nota & Arsip Digital
-          </div>
-        </div>
-      </div>
-
-      <div
-        className="bar-right"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}
-      >
-        <SyncBadge
-          isOnline={isOnline}
-          isSyncing={isSyncing}
-          hasFailed={hasFailed}
-        />
-
-        <button
-          className="bar-btn"
-          onClick={onPrintNota}
-          aria-label="Cetak Nota"
-        >
-          <Printer size={18} />
-        </button>
-
-        <button
-          className="bar-btn"
-          onClick={() => navigate('/settings')}
-          aria-label="Pengaturan"
-        >
-          <Settings size={18} />
-        </button>
-      </div>
+      )}
     </header>
   )
 }
