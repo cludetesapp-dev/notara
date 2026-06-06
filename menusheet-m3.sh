@@ -1,3 +1,6 @@
+#!/bin/bash
+
+cat > src/components/layout/MenuSheet.tsx <<'FILE'
 import {
   Settings,
   Package,
@@ -147,3 +150,6 @@ export function MenuSheet({
     </>
   )
 }
+FILE
+
+echo "MenuSheet Material 3 installed"
