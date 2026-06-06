@@ -1,3 +1,6 @@
+#!/bin/bash
+
+cat > src/features/dashboard/TrendChart.tsx <<'FILE'
 import {
   ResponsiveContainer,
   AreaChart,
@@ -122,3 +125,6 @@ export function TrendChart({
     </div>
   )
 }
+FILE
+
+echo "TrendChart Material 3 installed"
